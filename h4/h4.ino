@@ -3,8 +3,9 @@
 /* Change values in this section to suit your hardware. */
 
 // Define your hardware parameters here.
-const int ENCODER_STEPS_INT = 600; // 600 step spindle optical rotary encoder. Fractional values not supported.
+const int ENCODER_STEPS_INT = 2000; // 600 step spindle optical rotary encoder. Fractional values not supported.
 const int ENCODER_BACKLASH = 3; // Numer of impulses encoder can issue without movement of the spindle
+const bool ENCODER_PCNT = true; // hardware PCNT module for spindle encoder
 
 // Spindle rotary encoder pins. Swap values if the rotation direction is wrong.
 #define ENC_A 7
@@ -21,9 +22,11 @@ const bool NEEDS_REST_Z = false; // Set to false for closed-loop drivers, true f
 const long MAX_TRAVEL_MM_Z = 300; // Lathe bed doesn't allow to travel more than this in one go, 30cm / ~1 foot
 const long BACKLASH_DU_Z = 6500; // 0.65mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_Z = 'Z'; // Text shown on screen before axis position value, GCode axis name
+const bool Z_POS_BY_ENCODER = true; // sync position to axis encoder while stepper disabled
+const bool Z_BACKLASH_BY_ENCODER = true;
 
 // Cross-slide lead screw (X) parameters.
-const long SCREW_X_DU = 12500; // 1.25mm lead screw with 3x reduction in deci-microns (10^-7) of a meter
+const long SCREW_X_DU = 10000; // 1.25mm lead screw with 3x reduction in deci-microns (10^-7) of a meter
 const long MOTOR_STEPS_X = 2400; // 800 steps at 3x reduction
 const long SPEED_START_X = MOTOR_STEPS_X; // Initial speed of a motor, steps / second.
 const long ACCELERATION_X = 10 * MOTOR_STEPS_X; // Acceleration of a motor, steps / second ^ 2.
@@ -33,6 +36,8 @@ const bool NEEDS_REST_X = false; // Set to false for all kinds of drivers or X w
 const long MAX_TRAVEL_MM_X = 100; // Cross slide doesn't allow to travel more than this in one go, 10cm
 const long BACKLASH_DU_X = 1500; // 0.15mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_X = 'X'; // Text shown on screen before axis position value, GCode axis name
+const bool X_POS_BY_ENCODER = true; // sync position to axis encoder while stepper disabled
+const bool X_BACKLASH_BY_ENCODER = true;
 
 // Manual stepping with left/right/up/down buttons. Only used when step isn't default continuous (1mm or 0.1").
 const long STEP_TIME_MS = 500; // Time in milliseconds it should take to make 1 manual step.
@@ -59,9 +64,17 @@ const char NAME_A1 = 'C'; // Text shown on screen before axis position value, GC
 const bool PULSE_1_USE = false; // Whether there's a pulse generator connected on A11-A13 to be used for movement.
 const char PULSE_1_AXIS = NAME_Z; // Set to NAME_X to make A11-A13 pulse generator control X instead.
 const bool PULSE_1_INVERT = false; // Set to true to change the direction in which encoder moves the axis
+const bool PULSE_1_DRO = false; // Set to true if A1 encoder used as axis position sensor
+const long PULSE_1_DRO_DU = 50; // DRO Encoder precission in decimicrons.
+const bool PULSE_1_PCNT = false; // Hardware pulse counter on A1 encoder
+
 const bool PULSE_2_USE = false; // Whether there's a pulse generator connected on A21-A23 to be used for movement.
 const char PULSE_2_AXIS = NAME_X; // Set to NAME_Z to make A21-A23 pulse generator control Z instead.
 const bool PULSE_2_INVERT = true; // Set to false to change the direction in which encoder moves the axis
+const bool PULSE_2_DRO = false; // Set to true if A2 encoder used as axis position sensor
+const long PULSE_2_DRO_DU = 50; // DRO Encoder precission in decimicrons.
+const bool PULSE_2_PCNT = false; // Hardware pulse counter on A2 encoder
+
 const float PULSE_PER_REVOLUTION = 100; // PPR of handwheels used on A1 and/or A2.
 const long PULSE_MIN_WIDTH_US = 1000; // Microseconds width of the pulse that is required for it to be registered. Prevents noise.
 const long PULSE_HALF_BACKLASH = 2; // Prevents spurious reverses when moving using a handwheel. Raise to 3 or 4 if they still happen.
@@ -261,6 +274,14 @@ bool buttonOffPressed = false;
 bool buttonGearsPressed = false;
 bool buttonTurnPressed = false;
 
+#include "ESP32_Quad_Encoder.h"
+// will fill it later
+ESP32Encoder Encoder[MAX_ENCODERS] = {
+    ESP32Encoder(),
+    ESP32Encoder(),
+    ESP32Encoder()
+};
+
 bool inNumpad = false;
 int numpadDigits[20];
 int numpadIndex = 0;
@@ -305,6 +326,7 @@ struct Axis {
   long motorPos; // position of the motor in stepper motor steps, same as pos unless moving back, then differs by backlashSteps
   long savedMotorPos; // motorPos saved in Preferences
   bool continuous; // whether current movement is expected to continue until an unknown position
+  bool posByEncoder; // get position from encoder after stepper enabled
 
   long leftStop; // left stop value of pos
   long savedLeftStop; // value saved in Preferences
@@ -336,6 +358,8 @@ struct Axis {
   long estopSteps; // amount of steps to exceed machine limits
   long backlashSteps; // amount of steps in reverse direction to re-engage the carriage
   long gcodeRelativePos; // absolute position in steps that relative GCode refers to
+  bool needsEncoderBacklashCompensation; // Needs take out backlash after stepper enabled
+  bool backlashByEncoder;
 
   int ena; // Enable pin of this motor
   int dir; // Direction pin of this motor
@@ -343,7 +367,7 @@ struct Axis {
 };
 
 void initAxis(Axis* a, char name, bool active, bool rotational, float motorSteps, float screwPitch, long speedStart, long speedManualMove,
-    long acceleration, bool invertStepper, bool needsRest, long maxTravelMm, long backlashDu, int ena, int dir, int step) {
+    long acceleration, bool invertStepper, bool needsRest, long maxTravelMm, long backlashDu, int ena, int dir, int step, bool posByEncoder, bool backlashByEncoder) {
   a->mutex = xSemaphoreCreateMutex();
 
   a->name = name;
@@ -363,6 +387,7 @@ void initAxis(Axis* a, char name, bool active, bool rotational, float motorSteps
   a->motorPos = 0;
   a->savedMotorPos = 0;
   a->continuous = false;
+  a->posByEncoder = posByEncoder;
 
   a->leftStop = 0;
   a->savedLeftStop = 0;
@@ -397,6 +422,8 @@ void initAxis(Axis* a, char name, bool active, bool rotational, float motorSteps
   a->estopSteps = maxTravelMm * 10000 / a->screwPitch * a->motorSteps;
   a->backlashSteps = backlashDu * a->motorSteps / a->screwPitch;
   a->gcodeRelativePos = 0;
+  a->needsEncoderBacklashCompensation = needsRest; 
+  a->backlashByEncoder = backlashByEncoder;
 
   a->ena = ena;
   a->dir = dir;
@@ -975,6 +1002,7 @@ void updateDisplay() {
   }
 }
 
+
 // Called on a FALLING interrupt for the spindle rotary encoder pin.
 void IRAM_ATTR spinEnc() {
   spindlePosDelta += DREAD(ENC_B) ? -1 : 1;
@@ -1428,9 +1456,25 @@ void taskGcode(void *param) {
 
 void taskAttachInterrupts(void *param) {
   // Attaching interrupt on core 0 to have more time on core 1 where axes are moved.
-  attachInterrupt(digitalPinToInterrupt(ENC_A), spinEnc, FALLING);
-  if (PULSE_1_USE) attachInterrupt(digitalPinToInterrupt(A12), pulse1Enc, CHANGE);
-  if (PULSE_2_USE) attachInterrupt(digitalPinToInterrupt(A22), pulse2Enc, CHANGE);
+  if (ENCODER_PCNT){
+    Encoder[0] = ESP32Encoder(axis_s, ENC_A, ENC_B, enc_single, pa_up, 255);
+  } else {
+    attachInterrupt(digitalPinToInterrupt(ENC_A), spinEnc, FALLING);
+  }
+  if (PULSE_1_USE){
+    if (PULSE_1_PCNT){
+      Encoder[1] = ESP32Encoder(axis_z, A12, A13, enc_full, pa_none, 255);
+    }else{
+      attachInterrupt(digitalPinToInterrupt(A12), pulse1Enc, CHANGE);
+    }
+  }
+  if (PULSE_2_USE){
+    if (PULSE_2_PCNT){
+      Encoder[2] = ESP32Encoder(axis_x, A22, A23, enc_full, pa_none, 255);
+    }else{
+      attachInterrupt(digitalPinToInterrupt(A22), pulse2Enc, CHANGE);
+    }
+  }
   vTaskDelete(NULL);
 }
 
@@ -1441,6 +1485,7 @@ void setEmergencyStop(int kind) {
   xSemaphoreTake(x.mutex, 10);
   xSemaphoreTake(a1.mutex, 10);
 }
+
 
 void setup() {
   pinMode(ENC_A, INPUT_PULLUP);
@@ -1486,9 +1531,9 @@ void setup() {
     pref.putInt(PREF_VERSION, PREFERENCES_VERSION);
   }
 
-  initAxis(&z, NAME_Z, true, false, MOTOR_STEPS_Z, SCREW_Z_DU, SPEED_START_Z, SPEED_MANUAL_MOVE_Z, ACCELERATION_Z, INVERT_Z, NEEDS_REST_Z, MAX_TRAVEL_MM_Z, BACKLASH_DU_Z, Z_ENA, Z_DIR, Z_STEP);
-  initAxis(&x, NAME_X, true, false, MOTOR_STEPS_X, SCREW_X_DU, SPEED_START_X, SPEED_MANUAL_MOVE_X, ACCELERATION_X, INVERT_X, NEEDS_REST_X, MAX_TRAVEL_MM_X, BACKLASH_DU_X, X_ENA, X_DIR, X_STEP);
-  initAxis(&a1, NAME_A1, ACTIVE_A1, ROTARY_A1, MOTOR_STEPS_A1, SCREW_A1_DU, SPEED_START_A1, SPEED_MANUAL_MOVE_A1, ACCELERATION_A1, INVERT_A1, NEEDS_REST_A1, MAX_TRAVEL_MM_A1, BACKLASH_DU_A1, A11, A12, A13);
+  initAxis(&z, NAME_Z, true, false, MOTOR_STEPS_Z, SCREW_Z_DU, SPEED_START_Z, SPEED_MANUAL_MOVE_Z, ACCELERATION_Z, INVERT_Z, NEEDS_REST_Z, MAX_TRAVEL_MM_Z, BACKLASH_DU_Z, Z_ENA, Z_DIR, Z_STEP, Z_POS_BY_ENCODER, Z_BACKLASH_BY_ENCODER);
+  initAxis(&x, NAME_X, true, false, MOTOR_STEPS_X, SCREW_X_DU, SPEED_START_X, SPEED_MANUAL_MOVE_X, ACCELERATION_X, INVERT_X, NEEDS_REST_X, MAX_TRAVEL_MM_X, BACKLASH_DU_X, X_ENA, X_DIR, X_STEP, X_POS_BY_ENCODER, X_BACKLASH_BY_ENCODER);
+  initAxis(&a1, NAME_A1, ACTIVE_A1, ROTARY_A1, MOTOR_STEPS_A1, SCREW_A1_DU, SPEED_START_A1, SPEED_MANUAL_MOVE_A1, ACCELERATION_A1, INVERT_A1, NEEDS_REST_A1, MAX_TRAVEL_MM_A1, BACKLASH_DU_A1, A11, A12, A13, false,false);
 
   isOn = false;
   savedDupr = dupr = pref.getLong(PREF_DUPR);
@@ -1575,6 +1620,8 @@ void setup() {
   if (a1.active) xTaskCreatePinnedToCore(taskMoveA1, "taskMoveA1", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
   xTaskCreatePinnedToCore(taskAttachInterrupts, "taskAttachInterrupts", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
   xTaskCreatePinnedToCore(taskGcode, "taskGcode", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
+  //if (Z_POS_BY_ENCODER || X_POS_BY_ENCODER) {
+  //}
 }
 
 bool saveIfChanged() {
@@ -1737,18 +1784,24 @@ void IRAM_ATTR onAsyncTimer() {
   Axis* a = getAsyncAxis();
   if (!isOn || a->movingManually || (mode != MODE_ASYNC && mode != MODE_A1)) {
     return;
-  } else if (dupr > 0 && a->pos < a->leftStop) {
-    if (a->pos <= a->motorPos) {
-      a->pos++;
+  }
+  
+  if (dupr > 0 && a->pos < a->leftStop) {
+    if (!a->posByEncoder || !a->backlashByEncoder || !a->needsEncoderBacklashCompensation) {
+      if (a->pos <= a->motorPos){
+          a->pos++;
+      }
+      a->motorPos++;
+      a->posGlobal++;
     }
-    a->motorPos++;
-    a->posGlobal++;
   } else if (dupr < 0 && a->pos > a->rightStop) {
-    if (a->pos >= a->motorPos + a->backlashSteps) {
-      a->pos--;
+    if (!a->posByEncoder || !a->backlashByEncoder || !a->needsEncoderBacklashCompensation) {
+      if (a->pos >= a->motorPos + a->backlashSteps){
+        a->pos--;
+      }
+      a->motorPos--;
+      a->posGlobal--;
     }
-    a->motorPos--;
-    a->posGlobal--;
   } else {
     return;
   }
@@ -2452,6 +2505,9 @@ void updateEnable(Axis* a) {
     DHIGH(a->ena);
     // Stepper driver needs some time before it will react to pulses.
     DELAY(STEPPED_ENABLE_DELAY_MS);
+    if (a->posByEncoder && a->backlashByEncoder){
+        a->needsEncoderBacklashCompensation = true;
+    }
   } else {
     DLOW(a->ena);
   }
@@ -2468,7 +2524,7 @@ void moveAxis(Axis* a) {
 
   unsigned long nowUs = micros();
   float delayUs = 1000000.0 / a->speed;
-  if (nowUs - a->stepStartUs < delayUs - 5) {
+  if (nowUs - a->stepStartUs < delayUs - 5){
     // Not enough time has passed to issue this step.
     return;
   }
@@ -2480,6 +2536,8 @@ void moveAxis(Axis* a) {
       setDir(a, dir);
 
       DLOW(a->step);
+      // Do not change positions and speed while in DRO backlashcompensation
+      if (!a->posByEncoder || !a->backlashByEncoder || !a->needsEncoderBacklashCompensation) {
       int delta = dir ? 1 : -1;
       a->pendingPos -= delta;
       if (dir && a->motorPos >= a->pos) {
@@ -2497,8 +2555,12 @@ void moveAxis(Axis* a) {
       } else if (a->speed < a->speedStart) {
         a->speed = a->speedStart;
       }
-      a->stepStartUs = nowUs;
+      } else {
+        // Is actually need low pulse delay?
+        delayMicroseconds(10);
+      }
 
+      a->stepStartUs = nowUs;
       DHIGH(a->step);
     }
     xSemaphoreGive(a->mutex);
