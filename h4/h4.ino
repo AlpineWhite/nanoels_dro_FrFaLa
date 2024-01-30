@@ -3,7 +3,7 @@
 /* Change values in this section to suit your hardware. */
 
 // Define your hardware parameters here.
-const int ENCODER_STEPS_INT = 2000; // 600 step spindle optical rotary encoder. Fractional values not supported.
+const int ENCODER_STEPS_INT = 2000; // 1000 step spindle optical rotary encoder with 1:2 timing belt. Fractional values not supported.
 const int ENCODER_BACKLASH = 3; // Numer of impulses encoder can issue without movement of the spindle
 const bool ENCODER_PCNT = true; // hardware PCNT module for spindle encoder
 
@@ -12,7 +12,7 @@ const bool ENCODER_PCNT = true; // hardware PCNT module for spindle encoder
 #define ENC_B 15
 
 // Main lead screw (Z) parameters.
-const long SCREW_Z_DU = 20000; // 2mm lead screw in deci-microns (10^-7 of a meter)
+const long SCREW_Z_DU = 15000; // 1.5mm lead screw in deci-microns (10^-7 of a meter)
 const long MOTOR_STEPS_Z = 800;
 const long SPEED_START_Z = 2 * MOTOR_STEPS_Z; // Initial speed of a motor, steps / second.
 const long ACCELERATION_Z = 30 * MOTOR_STEPS_Z; // Acceleration of a motor, steps / second ^ 2.
@@ -22,22 +22,22 @@ const bool NEEDS_REST_Z = false; // Set to false for closed-loop drivers, true f
 const long MAX_TRAVEL_MM_Z = 300; // Lathe bed doesn't allow to travel more than this in one go, 30cm / ~1 foot
 const long BACKLASH_DU_Z = 6500; // 0.65mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_Z = 'Z'; // Text shown on screen before axis position value, GCode axis name
-const bool Z_POS_BY_ENCODER = true; // sync position to axis encoder while stepper disabled
-const bool Z_BACKLASH_BY_ENCODER = true;
+const bool Z_POS_BY_DRO = true; // sync position to axis encoder while stepper disabled
+const bool Z_BACKLASH_BY_DRO = true;
 
 // Cross-slide lead screw (X) parameters.
-const long SCREW_X_DU = 10000; // 1.25mm lead screw with 3x reduction in deci-microns (10^-7) of a meter
+const long SCREW_X_DU = 10000; // 1.0mm lead screw in deci-microns (10^-7) of a meter
 const long MOTOR_STEPS_X = 2400; // 800 steps at 3x reduction
 const long SPEED_START_X = MOTOR_STEPS_X; // Initial speed of a motor, steps / second.
 const long ACCELERATION_X = 10 * MOTOR_STEPS_X; // Acceleration of a motor, steps / second ^ 2.
 const long SPEED_MANUAL_MOVE_X = 3 * MOTOR_STEPS_X; // Maximum speed of a motor during manual move, steps / second.
 const bool INVERT_X = true; // change (true/false) if the carriage moves e.g. "left" when you press "right".
-const bool NEEDS_REST_X = false; // Set to false for all kinds of drivers or X will be unlocked when not moving.
+const bool NEEDS_REST_X = true; // Set to false for all kinds of drivers or X will be unlocked when not moving.
 const long MAX_TRAVEL_MM_X = 100; // Cross slide doesn't allow to travel more than this in one go, 10cm
-const long BACKLASH_DU_X = 1500; // 0.15mm backlash in deci-microns (10^-7 of a meter)
+const long BACKLASH_DU_X = 400; // 0.04mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_X = 'X'; // Text shown on screen before axis position value, GCode axis name
-const bool X_POS_BY_ENCODER = true; // sync position to axis encoder while stepper disabled
-const bool X_BACKLASH_BY_ENCODER = true;
+const bool X_POS_BY_DRO = true; // sync position to axis encoder while stepper disabled
+const bool X_BACKLASH_BY_DRO = true;
 
 // Manual stepping with left/right/up/down buttons. Only used when step isn't default continuous (1mm or 0.1").
 const long STEP_TIME_MS = 500; // Time in milliseconds it should take to make 1 manual step.
@@ -61,19 +61,21 @@ const long BACKLASH_DU_A1 = 0; // Assuming no backlash on the worm gear
 const char NAME_A1 = 'C'; // Text shown on screen before axis position value, GCode axis name
 
 // Manual handwheels on A1 and A2. Ignore if you don't have them installed.
-const bool PULSE_1_USE = false; // Whether there's a pulse generator connected on A11-A13 to be used for movement.
+const bool PULSE_1_USE = true; // Whether there's a pulse generator connected on A11-A13 to be used for movement.
 const char PULSE_1_AXIS = NAME_Z; // Set to NAME_X to make A11-A13 pulse generator control X instead.
 const bool PULSE_1_INVERT = false; // Set to true to change the direction in which encoder moves the axis
-const bool PULSE_1_DRO = false; // Set to true if A1 encoder used as axis position sensor
+const bool PULSE_1_DRO = true; // Set to true if A1 encoder used as axis position sensor
 const long PULSE_1_DRO_DU = 50; // DRO Encoder precission in decimicrons.
-const bool PULSE_1_PCNT = false; // Hardware pulse counter on A1 encoder
+const bool PULSE_1_PCNT = true; // Hardware pulse counter on A1 encoder
 
-const bool PULSE_2_USE = false; // Whether there's a pulse generator connected on A21-A23 to be used for movement.
+const bool PULSE_2_USE = true; // Whether there's a pulse generator connected on A21-A23 to be used for movement.
 const char PULSE_2_AXIS = NAME_X; // Set to NAME_Z to make A21-A23 pulse generator control Z instead.
 const bool PULSE_2_INVERT = true; // Set to false to change the direction in which encoder moves the axis
-const bool PULSE_2_DRO = false; // Set to true if A2 encoder used as axis position sensor
+const bool PULSE_2_DRO = true; // Set to true if A2 encoder used as axis position sensor
 const long PULSE_2_DRO_DU = 50; // DRO Encoder precission in decimicrons.
-const bool PULSE_2_PCNT = false; // Hardware pulse counter on A2 encoder
+const bool PULSE_2_PCNT = true; // Hardware pulse counter on A2 encoder
+
+const long DRO_READ_PERIOD_MS = 5; // Time in milliseconds to wait between DRO encoder reads.
 
 const float PULSE_PER_REVOLUTION = 100; // PPR of handwheels used on A1 and/or A2.
 const long PULSE_MIN_WIDTH_US = 1000; // Microseconds width of the pulse that is required for it to be registered. Prevents noise.
@@ -277,13 +279,10 @@ bool buttonOffPressed = false;
 bool buttonGearsPressed = false;
 bool buttonTurnPressed = false;
 
-#include "ESP32_Quad_Encoder.h"
-// will fill it later
-ESP32Encoder Encoder[MAX_ENCODERS] = {
-    ESP32Encoder(),
-    ESP32Encoder(),
-    ESP32Encoder()
-};
+#include "ESP32Encoder.h"
+ESP32Encoder pcntEncoderSpindle;
+ESP32Encoder pcntEncoderPulse1;
+ESP32Encoder pcntEncoderPulse2;
 
 bool inNumpad = false;
 int numpadDigits[20];
@@ -329,7 +328,7 @@ struct Axis {
   long motorPos; // position of the motor in stepper motor steps, same as pos unless moving back, then differs by backlashSteps
   long savedMotorPos; // motorPos saved in Preferences
   bool continuous; // whether current movement is expected to continue until an unknown position
-  bool posByEncoder; // get position from encoder after stepper enabled
+  bool posByDRO; // get position from encoder after stepper enabled
 
   long leftStop; // left stop value of pos
   long savedLeftStop; // value saved in Preferences
@@ -361,8 +360,8 @@ struct Axis {
   long estopSteps; // amount of steps to exceed machine limits
   long backlashSteps; // amount of steps in reverse direction to re-engage the carriage
   long gcodeRelativePos; // absolute position in steps that relative GCode refers to
-  bool needsEncoderBacklashCompensation; // Needs take out backlash after stepper enabled
-  bool backlashByEncoder;
+  bool needsDROBacklashCompensation; // Needs take out backlash after stepper enabled
+  bool backlashByDRO;
 
   int ena; // Enable pin of this motor
   int dir; // Direction pin of this motor
@@ -370,7 +369,7 @@ struct Axis {
 };
 
 void initAxis(Axis* a, char name, bool active, bool rotational, float motorSteps, float screwPitch, long speedStart, long speedManualMove,
-    long acceleration, bool invertStepper, bool needsRest, long maxTravelMm, long backlashDu, int ena, int dir, int step, bool posByEncoder, bool backlashByEncoder) {
+    long acceleration, bool invertStepper, bool needsRest, long maxTravelMm, long backlashDu, int ena, int dir, int step, bool posByDRO, bool backlashByDRO) {
   a->mutex = xSemaphoreCreateMutex();
 
   a->name = name;
@@ -390,7 +389,7 @@ void initAxis(Axis* a, char name, bool active, bool rotational, float motorSteps
   a->motorPos = 0;
   a->savedMotorPos = 0;
   a->continuous = false;
-  a->posByEncoder = posByEncoder;
+  a->posByDRO = posByDRO;
 
   a->leftStop = 0;
   a->savedLeftStop = 0;
@@ -425,8 +424,8 @@ void initAxis(Axis* a, char name, bool active, bool rotational, float motorSteps
   a->estopSteps = maxTravelMm * 10000 / a->screwPitch * a->motorSteps;
   a->backlashSteps = backlashDu * a->motorSteps / a->screwPitch;
   a->gcodeRelativePos = 0;
-  a->needsEncoderBacklashCompensation = needsRest; 
-  a->backlashByEncoder = backlashByEncoder;
+  a->needsDROBacklashCompensation = needsRest; 
+  a->backlashByDRO = backlashByDRO;
 
   a->ena = ena;
   a->dir = dir;
@@ -447,13 +446,16 @@ long spindlePosAvg = 0; // Spindle position accounting for encoder backlash
 long savedSpindlePosAvg = 0; // spindlePosAvg saved in Preferences
 long savedSpindlePos = 0; // spindlePos value saved in Preferences
 volatile long spindlePosDelta = 0; // Unprocessed encoder ticks.
+int64_t spindlePcntPrev = 0;
 int spindlePosSync = 0; // Non-zero if gearbox is on and a soft limit was removed while axis was on it
 int savedSpindlePosSync = 0; // spindlePosSync saved in Preferences
 long spindlePosGlobal = 0; // global spindle position that is unaffected by e.g. zeroing
 long savedSpindlePosGlobal = 0; // spindlePosGlobal saved in Preferences
 
 volatile int pulse1Delta = 0; // Outstanding pulses generated by pulse generator on terminal A1.
+int64_t pulse1PcntPrev = 0;
 volatile int pulse2Delta = 0; // Outstanding pulses generated by pulse generator on terminal A2.
+int64_t pulse2PcntPrev = 0;
 
 bool showAngle = false; // Whether to show 0-359 spindle angle on screen
 bool showTacho = false; // Whether to show spindle RPM on screen
@@ -1166,7 +1168,12 @@ void waitForStep(Axis* a) {
 
 int getAndResetPulses(Axis* a) {
   int delta = 0;
-  if (PULSE_1_AXIS == a->name) {
+  if ((PULSE_1_AXIS == a->name) && PULSE_1_USE) {
+    if (PULSE_1_PCNT && !PULSE_1_DRO){
+	int64_t pulse1PcntNew = pcntEncoderPulse1.getCount();
+	pulse1Delta = pulse1PcntNew - pulse1PcntPrev + pulse1Delta;
+	pulse1PcntPrev = pulse1PcntNew;
+    }
     if (pulse1Delta < -PULSE_HALF_BACKLASH) {
       noInterrupts();
       delta = pulse1Delta + PULSE_HALF_BACKLASH;
@@ -1178,7 +1185,12 @@ int getAndResetPulses(Axis* a) {
       pulse1Delta = PULSE_HALF_BACKLASH;
       interrupts();
     }
-  } else if (PULSE_2_AXIS == a->name) {
+  } else if ((PULSE_2_AXIS == a->name) && PULSE_2_USE) {
+    if (PULSE_2_PCNT && !PULSE_2_DRO){
+	int64_t pulse2PcntNew = pcntEncoderPulse2.getCount();
+	pulse2Delta = pulse2PcntNew - pulse2PcntPrev + pulse2Delta;
+	pulse2PcntPrev = pulse2PcntNew;
+    }
     if (pulse2Delta < -PULSE_HALF_BACKLASH) {
       noInterrupts();
       delta = pulse2Delta + PULSE_HALF_BACKLASH;
@@ -1607,24 +1619,84 @@ bool removeAllGcode() {
 
 void taskAttachInterrupts(void *param) {
   // Attaching interrupt on core 0 to have more time on core 1 where axes are moved.
+  ESP32Encoder::useInternalWeakPullResistors=UP;
   if (ENCODER_PCNT){
-    Encoder[0] = ESP32Encoder(axis_s, ENC_A, ENC_B, enc_single, pa_up, 255);
+    pcntEncoderSpindle.attachFullQuad(ENC_A, ENC_B);
+    pcntEncoderSpindle.setFilter(255);
+    pcntEncoderSpindle.clearCount();
+    spindlePcntPrev = 0;
   } else {
     attachInterrupt(digitalPinToInterrupt(ENC_A), spinEnc, FALLING);
   }
   if (PULSE_1_USE){
     if (PULSE_1_PCNT){
-      Encoder[1] = ESP32Encoder(axis_z, A12, A13, enc_full, pa_none, 255);
+      pcntEncoderPulse1.attachFullQuad(A12, A13);
+      pcntEncoderPulse1.setFilter(255);
+      pcntEncoderPulse1.clearCount();
+      pulse1PcntPrev = 0;
     }else{
       attachInterrupt(digitalPinToInterrupt(A12), pulse1Enc, CHANGE);
     }
   }
   if (PULSE_2_USE){
     if (PULSE_2_PCNT){
-      Encoder[2] = ESP32Encoder(axis_x, A22, A23, enc_full, pa_none, 255);
+      pcntEncoderPulse2.attachFullQuad(A22, A23);
+      pcntEncoderPulse2.setFilter(255);
+      pcntEncoderPulse2.clearCount();
+      pulse2PcntPrev = 0;
     }else{
       attachInterrupt(digitalPinToInterrupt(A22), pulse2Enc, CHANGE);
     }
+  }
+  vTaskDelete(NULL);
+}
+
+void taskDRO(void *param) {
+  long new_pos;
+  long pos_delta;
+  long motor_delta;
+  while (emergencyStop == ESTOP_NONE) {
+    if ((z.posByDRO) &&
+	(z.disabled || (z.needsRest && z.stepperEnableCounter <= 0) || z.needsDROBacklashCompensation)){
+	new_pos = round((long) pcntEncoderPulse1.getCount() * PULSE_1_DRO_DU * MOTOR_STEPS_Z / SCREW_Z_DU) - z.originPos;
+	pos_delta = new_pos - z.pos;
+	if (pos_delta < 0){
+	    // going right, motor should be differ by backlashSteps
+	    motor_delta = new_pos - z.backlashSteps - z.motorPos;
+	    z.motorPos = new_pos - z.backlashSteps;
+	    z.posGlobal -=  motor_delta;
+	    z.pos = new_pos;
+	    z.needsDROBacklashCompensation = false;
+	} else if (pos_delta > 0){
+	    // going left
+	    motor_delta = new_pos - z.motorPos;
+	    z.motorPos = new_pos;
+	    z.posGlobal -=  motor_delta;
+	    z.pos = new_pos;
+	    z.needsDROBacklashCompensation = false;
+	}
+    }
+    if ((x.posByDRO) &&
+	(x.disabled || (x.needsRest && x.stepperEnableCounter <= 0) || x.needsDROBacklashCompensation)){
+	new_pos = round((long) pcntEncoderPulse2.getCount() * PULSE_2_DRO_DU * MOTOR_STEPS_X / SCREW_X_DU) - x.originPos;
+	pos_delta = new_pos - x.pos;
+	if (pos_delta < 0){
+	    // going right, motor should be differ by backlashSteps
+	    motor_delta = new_pos - x.backlashSteps - x.motorPos;
+	    x.motorPos = new_pos - x.backlashSteps;
+	    x.posGlobal -=  motor_delta;
+	    x.pos = new_pos;
+	    x.needsDROBacklashCompensation = false;
+	} else if (pos_delta > 0){
+	    // going left
+	    motor_delta = new_pos - x.motorPos;
+	    x.motorPos = new_pos;
+	    x.posGlobal -=  motor_delta;
+	    x.pos = new_pos;
+	    x.needsDROBacklashCompensation = false;
+	}
+    }
+    taskYIELD();
   }
   vTaskDelete(NULL);
 }
@@ -1682,8 +1754,8 @@ void setup() {
     pref.putInt(PREF_VERSION, PREFERENCES_VERSION);
   }
 
-  initAxis(&z, NAME_Z, true, false, MOTOR_STEPS_Z, SCREW_Z_DU, SPEED_START_Z, SPEED_MANUAL_MOVE_Z, ACCELERATION_Z, INVERT_Z, NEEDS_REST_Z, MAX_TRAVEL_MM_Z, BACKLASH_DU_Z, Z_ENA, Z_DIR, Z_STEP, Z_POS_BY_ENCODER, Z_BACKLASH_BY_ENCODER);
-  initAxis(&x, NAME_X, true, false, MOTOR_STEPS_X, SCREW_X_DU, SPEED_START_X, SPEED_MANUAL_MOVE_X, ACCELERATION_X, INVERT_X, NEEDS_REST_X, MAX_TRAVEL_MM_X, BACKLASH_DU_X, X_ENA, X_DIR, X_STEP, X_POS_BY_ENCODER, X_BACKLASH_BY_ENCODER);
+  initAxis(&z, NAME_Z, true, false, MOTOR_STEPS_Z, SCREW_Z_DU, SPEED_START_Z, SPEED_MANUAL_MOVE_Z, ACCELERATION_Z, INVERT_Z, NEEDS_REST_Z, MAX_TRAVEL_MM_Z, BACKLASH_DU_Z, Z_ENA, Z_DIR, Z_STEP, Z_POS_BY_DRO, Z_BACKLASH_BY_DRO);
+  initAxis(&x, NAME_X, true, false, MOTOR_STEPS_X, SCREW_X_DU, SPEED_START_X, SPEED_MANUAL_MOVE_X, ACCELERATION_X, INVERT_X, NEEDS_REST_X, MAX_TRAVEL_MM_X, BACKLASH_DU_X, X_ENA, X_DIR, X_STEP, X_POS_BY_DRO, X_BACKLASH_BY_DRO);
   initAxis(&a1, NAME_A1, ACTIVE_A1, ROTARY_A1, MOTOR_STEPS_A1, SCREW_A1_DU, SPEED_START_A1, SPEED_MANUAL_MOVE_A1, ACCELERATION_A1, INVERT_A1, NEEDS_REST_A1, MAX_TRAVEL_MM_A1, BACKLASH_DU_A1, A11, A12, A13, false,false);
 
   isOn = false;
@@ -1782,8 +1854,21 @@ void setup() {
   if (a1.active) xTaskCreatePinnedToCore(taskMoveA1, "taskMoveA1", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
   xTaskCreatePinnedToCore(taskAttachInterrupts, "taskAttachInterrupts", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
   xTaskCreatePinnedToCore(taskGcode, "taskGcode", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
-  //if (Z_POS_BY_ENCODER || X_POS_BY_ENCODER) {
-  //}
+  if (ENCODER_PCNT) while (!pcntEncoderSpindle.isAttached()){ delay(1);}
+  if (PULSE_1_USE && PULSE_1_PCNT) while (!pcntEncoderPulse1.isAttached()){ delay(1);}
+  if (PULSE_2_USE && PULSE_2_PCNT) while (!pcntEncoderPulse2.isAttached()){ delay(1);}
+  if ((PULSE_1_USE && PULSE_1_PCNT && PULSE_1_DRO) || (PULSE_2_USE && PULSE_2_PCNT && PULSE_2_DRO)){
+    xTaskCreatePinnedToCore(taskDRO, "taskDRO", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
+  }
+  
+  if (PULSE_1_USE && PULSE_1_PCNT && PULSE_1_DRO && Z_POS_BY_DRO){
+    int64_t precalc = round(getAxisPosDu(&z) / PULSE_1_DRO_DU);
+    pcntEncoderPulse1.setCount(precalc);
+  }
+  if (PULSE_2_USE && PULSE_2_PCNT && PULSE_2_DRO && X_POS_BY_DRO){
+    int64_t precalc = round(getAxisPosDu(&x) / PULSE_2_DRO_DU);
+    pcntEncoderPulse2.setCount(precalc);
+  }
 }
 
 bool saveIfChanged() {
@@ -1876,6 +1961,13 @@ void markOrigin() {
 
 void markAxis0(Axis* a) {
   a->originPos = -a->pos;
+  if ((PULSE_1_AXIS == a->name) && PULSE_1_USE && PULSE_1_PCNT && PULSE_1_DRO){
+    pcntEncoderPulse1.clearCount();
+  }
+  if ((PULSE_2_AXIS == a->name) && PULSE_2_USE && PULSE_2_PCNT && PULSE_2_DRO){
+    pcntEncoderPulse2.clearCount();
+  }
+
 }
 
 Axis* getAsyncAxis() {
@@ -1947,9 +2039,18 @@ void IRAM_ATTR onAsyncTimer() {
   if (!isOn || a->movingManually || (mode != MODE_ASYNC && mode != MODE_A1)) {
     return;
   }
+
+  if ((a->posByDRO && a->backlashByDRO && a->needsDROBacklashCompensation) &&
+      (a->stepStartUs + DRO_READ_PERIOD_MS * 1000 > micros())){
+    // Axis have uncompensated backlash after stepper disable
+    // step slow and wait DRO position changed.
+    // possible meaningfull for faster movements
+    //not to step yet
+    return;
+  }
   
   if (dupr > 0 && a->pos < a->leftStop) {
-    if (!a->posByEncoder || !a->backlashByEncoder || !a->needsEncoderBacklashCompensation) {
+    if (!a->posByDRO || !a->backlashByDRO || !a->needsDROBacklashCompensation) {
       if (a->pos <= a->motorPos){
           a->pos++;
       }
@@ -1957,7 +2058,7 @@ void IRAM_ATTR onAsyncTimer() {
       a->posGlobal++;
     }
   } else if (dupr < 0 && a->pos > a->rightStop) {
-    if (!a->posByEncoder || !a->backlashByEncoder || !a->needsEncoderBacklashCompensation) {
+    if (!a->posByDRO || !a->backlashByDRO || !a->needsDROBacklashCompensation) {
       if (a->pos >= a->motorPos + a->backlashSteps){
         a->pos--;
       }
@@ -2696,8 +2797,8 @@ void updateEnable(Axis* a) {
     DHIGH(a->ena);
     // Stepper driver needs some time before it will react to pulses.
     DELAY(STEPPED_ENABLE_DELAY_MS);
-    if (a->posByEncoder && a->backlashByEncoder){
-        a->needsEncoderBacklashCompensation = true;
+    if (a->posByDRO && a->backlashByDRO){
+        a->needsDROBacklashCompensation = true;
     }
   } else {
     DLOW(a->ena);
@@ -2715,7 +2816,9 @@ void moveAxis(Axis* a) {
 
   unsigned long nowUs = micros();
   float delayUs = 1000000.0 / a->speed;
-  if (nowUs - a->stepStartUs < delayUs - 5){
+  if ((nowUs - a->stepStartUs < delayUs - 5)||
+      ((a->posByDRO && a->backlashByDRO && a->needsDROBacklashCompensation) &&
+       (a->stepStartUs + DRO_READ_PERIOD_MS * 1000 > nowUs)) ){
     // Not enough time has passed to issue this step.
     return;
   }
@@ -2728,24 +2831,24 @@ void moveAxis(Axis* a) {
 
       DLOW(a->step);
       // Do not change positions and speed while in DRO backlashcompensation
-      if (!a->posByEncoder || !a->backlashByEncoder || !a->needsEncoderBacklashCompensation) {
-      int delta = dir ? 1 : -1;
-      a->pendingPos -= delta;
-      if (dir && a->motorPos >= a->pos) {
-        a->pos++;
-      } else if (!dir && a->motorPos <= (a->pos - a->backlashSteps)) {
-        a->pos--;
-      }
-      a->motorPos += delta;
-      a->posGlobal += delta;
+      if (!a->posByDRO || !a->backlashByDRO || !a->needsDROBacklashCompensation) {
+        int delta = dir ? 1 : -1;
+        a->pendingPos -= delta;
+        if (dir && a->motorPos >= a->pos) {
+    	  a->pos++;
+        } else if (!dir && a->motorPos <= (a->pos - a->backlashSteps)) {
+    	  a->pos--;
+        }
+        a->motorPos += delta;
+        a->posGlobal += delta;
 
-      bool accelerate = a->continuous || a->pendingPos >= a->decelerateSteps || a->pendingPos <= -a->decelerateSteps;
-      a->speed += (accelerate ? 1 : -1) * a->acceleration * delayUs / 1000000.0;
-      if (a->speed > a->speedMax) {
-        a->speed = a->speedMax;
-      } else if (a->speed < a->speedStart) {
-        a->speed = a->speedStart;
-      }
+        bool accelerate = a->continuous || a->pendingPos >= a->decelerateSteps || a->pendingPos <= -a->decelerateSteps;
+        a->speed += (accelerate ? 1 : -1) * a->acceleration * delayUs / 1000000.0;
+        if (a->speed > a->speedMax) {
+          a->speed = a->speedMax;
+        } else if (a->speed < a->speedStart) {
+          a->speed = a->speedStart;
+        }
       } else {
         // Is actually need low pulse delay?
         delayMicroseconds(10);
@@ -3258,15 +3361,23 @@ void discountFullSpindleTurns() {
 }
 
 void processSpindlePosDelta() {
-  if (spindlePosDelta == 0) {
-    return;
+  long delta;
+  if (ENCODER_PCNT){
+    int64_t spindlePcntNew = pcntEncoderSpindle.getCount();
+    delta = spindlePcntNew - spindlePcntPrev;
+    if (delta == 0){
+      return;
+    }
+    spindlePcntPrev = spindlePcntNew;
+  } else {
+    if (spindlePosDelta == 0) {
+      return;
+    }
+    noInterrupts();
+    delta = spindlePosDelta;
+    spindlePosDelta = 0;
+    interrupts();
   }
-
-  noInterrupts();
-  long delta = spindlePosDelta;
-  spindlePosDelta = 0;
-  interrupts();
-
   unsigned long microsNow = micros();
   if (showTacho || mode == MODE_GCODE) {
     if (spindleEncTimeIndex >= RPM_BULK) {
