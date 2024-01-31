@@ -3,8 +3,8 @@
 /* Change values in this section to suit your hardware. */
 
 // Define your hardware parameters here.
-const int ENCODER_STEPS_INT = 2000; // 1000 step spindle optical rotary encoder with 1:2 timing belt. Fractional values not supported.
-const int ENCODER_BACKLASH = 3; // Numer of impulses encoder can issue without movement of the spindle
+const int ENCODER_STEPS_INT = 8000; // 1000 step spindle optical rotary encoder with 1:2 timing belt. Fractional values not supported.
+const int ENCODER_BACKLASH = 80; // Numer of impulses encoder can issue without movement of the spindle
 const bool ENCODER_PCNT = true; // hardware PCNT module for spindle encoder
 
 // Spindle rotary encoder pins. Swap values if the rotation direction is wrong.
@@ -17,10 +17,10 @@ const long MOTOR_STEPS_Z = 800;
 const long SPEED_START_Z = 2 * MOTOR_STEPS_Z; // Initial speed of a motor, steps / second.
 const long ACCELERATION_Z = 30 * MOTOR_STEPS_Z; // Acceleration of a motor, steps / second ^ 2.
 const long SPEED_MANUAL_MOVE_Z = 6 * MOTOR_STEPS_Z; // Maximum speed of a motor during manual move, steps / second.
-const bool INVERT_Z = false; // change (true/false) if the carriage moves e.g. "left" when you press "right".
+const bool INVERT_Z = true; // change (true/false) if the carriage moves e.g. "left" when you press "right".
 const bool NEEDS_REST_Z = false; // Set to false for closed-loop drivers, true for open-loop.
 const long MAX_TRAVEL_MM_Z = 300; // Lathe bed doesn't allow to travel more than this in one go, 30cm / ~1 foot
-const long BACKLASH_DU_Z = 6500; // 0.65mm backlash in deci-microns (10^-7 of a meter)
+const long BACKLASH_DU_Z = 2600; // 0.26mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_Z = 'Z'; // Text shown on screen before axis position value, GCode axis name
 const bool Z_POS_BY_DRO = true; // sync position to axis encoder while stepper disabled
 const bool Z_BACKLASH_BY_DRO = true;
@@ -61,14 +61,14 @@ const long BACKLASH_DU_A1 = 0; // Assuming no backlash on the worm gear
 const char NAME_A1 = 'C'; // Text shown on screen before axis position value, GCode axis name
 
 // Manual handwheels on A1 and A2. Ignore if you don't have them installed.
-const bool PULSE_1_USE = true; // Whether there's a pulse generator connected on A11-A13 to be used for movement.
+const bool PULSE_1_USE = false; // Whether there's a pulse generator connected on A11-A13 to be used for movement.
 const char PULSE_1_AXIS = NAME_Z; // Set to NAME_X to make A11-A13 pulse generator control X instead.
 const bool PULSE_1_INVERT = false; // Set to true to change the direction in which encoder moves the axis
 const bool PULSE_1_DRO = true; // Set to true if A1 encoder used as axis position sensor
 const long PULSE_1_DRO_DU = 50; // DRO Encoder precission in decimicrons.
 const bool PULSE_1_PCNT = true; // Hardware pulse counter on A1 encoder
 
-const bool PULSE_2_USE = true; // Whether there's a pulse generator connected on A21-A23 to be used for movement.
+const bool PULSE_2_USE = false; // Whether there's a pulse generator connected on A21-A23 to be used for movement.
 const char PULSE_2_AXIS = NAME_X; // Set to NAME_Z to make A21-A23 pulse generator control Z instead.
 const bool PULSE_2_INVERT = true; // Set to false to change the direction in which encoder moves the axis
 const bool PULSE_2_DRO = true; // Set to true if A2 encoder used as axis position sensor
@@ -1621,8 +1621,9 @@ void taskAttachInterrupts(void *param) {
   // Attaching interrupt on core 0 to have more time on core 1 where axes are moved.
   ESP32Encoder::useInternalWeakPullResistors=UP;
   if (ENCODER_PCNT){
+    //pcntEncoderSpindle.attachSingleEdge(ENC_A, ENC_B);
     pcntEncoderSpindle.attachFullQuad(ENC_A, ENC_B);
-    pcntEncoderSpindle.setFilter(255);
+    pcntEncoderSpindle.setFilter(1023);
     pcntEncoderSpindle.clearCount();
     spindlePcntPrev = 0;
   } else {
@@ -1631,7 +1632,7 @@ void taskAttachInterrupts(void *param) {
   if (PULSE_1_USE){
     if (PULSE_1_PCNT){
       pcntEncoderPulse1.attachFullQuad(A12, A13);
-      pcntEncoderPulse1.setFilter(255);
+      pcntEncoderPulse1.setFilter(1023);
       pcntEncoderPulse1.clearCount();
       pulse1PcntPrev = 0;
     }else{
@@ -1641,7 +1642,7 @@ void taskAttachInterrupts(void *param) {
   if (PULSE_2_USE){
     if (PULSE_2_PCNT){
       pcntEncoderPulse2.attachFullQuad(A22, A23);
-      pcntEncoderPulse2.setFilter(255);
+      pcntEncoderPulse2.setFilter(1023);
       pcntEncoderPulse2.clearCount();
       pulse2PcntPrev = 0;
     }else{
