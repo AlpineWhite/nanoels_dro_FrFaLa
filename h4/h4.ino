@@ -4,8 +4,9 @@
 
 // Define your hardware parameters here.
 const int ENCODER_STEPS_INT = 8000; // 1000 step spindle optical rotary encoder with 1:2 timing belt. Fractional values not supported.
-const int ENCODER_BACKLASH = 80; // Numer of impulses encoder can issue without movement of the spindle
+const int ENCODER_BACKLASH = 8; // Numer of impulses encoder can issue without movement of the spindle
 const bool ENCODER_PCNT = true; // hardware PCNT module for spindle encoder
+const long ENCODER_PCNT_INTERVAL_US = 10; 
 
 // Spindle rotary encoder pins. Swap values if the rotation direction is wrong.
 #define ENC_A 7
@@ -447,6 +448,7 @@ long savedSpindlePosAvg = 0; // spindlePosAvg saved in Preferences
 long savedSpindlePos = 0; // spindlePos value saved in Preferences
 volatile long spindlePosDelta = 0; // Unprocessed encoder ticks.
 int64_t spindlePcntPrev = 0;
+unsigned long spindlePcntTime = 0; // micros() of the previous PCNT read
 int spindlePosSync = 0; // Non-zero if gearbox is on and a soft limit was removed while axis was on it
 int savedSpindlePosSync = 0; // spindlePosSync saved in Preferences
 long spindlePosGlobal = 0; // global spindle position that is unaffected by e.g. zeroing
@@ -1870,6 +1872,7 @@ void setup() {
     int64_t precalc = round(getAxisPosDu(&x) / PULSE_2_DRO_DU);
     pcntEncoderPulse2.setCount(precalc);
   }
+
 }
 
 bool saveIfChanged() {
@@ -1879,7 +1882,7 @@ bool saveIfChanged() {
       mode == savedMode && measure == savedMeasure && x.pos == x.savedPos && x.originPos == x.savedOriginPos && x.posGlobal == x.savedPosGlobal && x.motorPos == x.savedMotorPos && x.leftStop == x.savedLeftStop && x.rightStop == x.savedRightStop && x.disabled == x.savedDisabled &&
       a1.pos == a1.savedPos && a1.originPos == a1.savedOriginPos && a1.posGlobal == a1.savedPosGlobal && a1.motorPos == a1.savedMotorPos && a1.leftStop == a1.savedLeftStop && a1.rightStop == a1.savedRightStop && a1.disabled == a1.savedDisabled &&
       coneRatio == savedConeRatio && turnPasses == savedTurnPasses && savedAuxForward == auxForward) return false;
-
+  
   Preferences pref;
   pref.begin(PREF_NAMESPACE);
   if (dupr != savedDupr) pref.putLong(PREF_DUPR, savedDupr = dupr);
@@ -3367,6 +3370,20 @@ void processSpindlePosDelta() {
     int64_t spindlePcntNew = pcntEncoderSpindle.getCount();
     delta = spindlePcntNew - spindlePcntPrev;
     if (delta == 0){
+      return;
+    }
+    if (abs(delta) > 32000){
+	    // Try to re-read
+	    spindlePcntNew = pcntEncoderSpindle.getCount();
+	    delta = spindlePcntNew - spindlePcntPrev;
+    }
+    if (abs(delta) > ENCODER_STEPS_INT){
+	    Serial.print("EncErr: delta ");
+	    Serial.print(delta);
+	    Serial.print(" Prv ");
+	    Serial.print(spindlePcntPrev);
+	    Serial.print(" New ");
+	    Serial.println(spindlePcntNew);
       return;
     }
     spindlePcntPrev = spindlePcntNew;
