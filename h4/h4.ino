@@ -6,7 +6,6 @@
 const int ENCODER_STEPS_INT = 8000; // 1000 step spindle optical rotary encoder with 1:2 timing belt. Fractional values not supported.
 const int ENCODER_BACKLASH = 8; // Numer of impulses encoder can issue without movement of the spindle
 const bool ENCODER_PCNT = true; // hardware PCNT module for spindle encoder
-const long ENCODER_PCNT_INTERVAL_US = 10; 
 
 // Spindle rotary encoder pins. Swap values if the rotation direction is wrong.
 #define ENC_A 7
@@ -14,16 +13,17 @@ const long ENCODER_PCNT_INTERVAL_US = 10;
 
 // Main lead screw (Z) parameters.
 const long SCREW_Z_DU = 15000; // 1.5mm lead screw in deci-microns (10^-7 of a meter)
-const long MOTOR_STEPS_Z = 800;
+const long MOTOR_STEPS_Z = 1600;
 const long SPEED_START_Z = 2 * MOTOR_STEPS_Z; // Initial speed of a motor, steps / second.
 const long ACCELERATION_Z = 30 * MOTOR_STEPS_Z; // Acceleration of a motor, steps / second ^ 2.
 const long SPEED_MANUAL_MOVE_Z = 6 * MOTOR_STEPS_Z; // Maximum speed of a motor during manual move, steps / second.
 const bool INVERT_Z = true; // change (true/false) if the carriage moves e.g. "left" when you press "right".
-const bool NEEDS_REST_Z = false; // Set to false for closed-loop drivers, true for open-loop.
+const bool NEEDS_REST_Z = true; // Set to false for closed-loop drivers, true for open-loop.
 const long MAX_TRAVEL_MM_Z = 300; // Lathe bed doesn't allow to travel more than this in one go, 30cm / ~1 foot
 const long BACKLASH_DU_Z = 2600; // 0.26mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_Z = 'Z'; // Text shown on screen before axis position value, GCode axis name
 const bool Z_POS_BY_DRO = true; // sync position to axis encoder while stepper disabled
+                                // be carefull, enabling this without any DRO source could lock axis
 const bool Z_BACKLASH_BY_DRO = true;
 
 // Cross-slide lead screw (X) parameters.
@@ -38,6 +38,7 @@ const long MAX_TRAVEL_MM_X = 100; // Cross slide doesn't allow to travel more th
 const long BACKLASH_DU_X = 400; // 0.04mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_X = 'X'; // Text shown on screen before axis position value, GCode axis name
 const bool X_POS_BY_DRO = true; // sync position to axis encoder while stepper disabled
+                                // be carefull, enabling this without any DRO source could lock axis
 const bool X_BACKLASH_BY_DRO = true;
 
 // Manual stepping with left/right/up/down buttons. Only used when step isn't default continuous (1mm or 0.1").
@@ -62,14 +63,14 @@ const long BACKLASH_DU_A1 = 0; // Assuming no backlash on the worm gear
 const char NAME_A1 = 'C'; // Text shown on screen before axis position value, GCode axis name
 
 // Manual handwheels on A1 and A2. Ignore if you don't have them installed.
-const bool PULSE_1_USE = false; // Whether there's a pulse generator connected on A11-A13 to be used for movement.
+const bool PULSE_1_USE = true; // Whether there's a pulse generator connected on A11-A13 to be used for movement.
 const char PULSE_1_AXIS = NAME_Z; // Set to NAME_X to make A11-A13 pulse generator control X instead.
 const bool PULSE_1_INVERT = false; // Set to true to change the direction in which encoder moves the axis
 const bool PULSE_1_DRO = true; // Set to true if A1 encoder used as axis position sensor
 const long PULSE_1_DRO_DU = 50; // DRO Encoder precission in decimicrons.
 const bool PULSE_1_PCNT = true; // Hardware pulse counter on A1 encoder
 
-const bool PULSE_2_USE = false; // Whether there's a pulse generator connected on A21-A23 to be used for movement.
+const bool PULSE_2_USE = true; // Whether there's a pulse generator connected on A21-A23 to be used for movement.
 const char PULSE_2_AXIS = NAME_X; // Set to NAME_Z to make A21-A23 pulse generator control Z instead.
 const bool PULSE_2_INVERT = true; // Set to false to change the direction in which encoder moves the axis
 const bool PULSE_2_DRO = true; // Set to true if A2 encoder used as axis position sensor
@@ -3373,18 +3374,18 @@ void processSpindlePosDelta() {
       return;
     }
     if (abs(delta) > 32000){
-	    // Try to re-read
-	    spindlePcntNew = pcntEncoderSpindle.getCount();
-	    delta = spindlePcntNew - spindlePcntPrev;
+      // Try to re-read
+      spindlePcntNew = pcntEncoderSpindle.getCount();
+      delta = spindlePcntNew - spindlePcntPrev;
     }
     if (abs(delta) > ENCODER_STEPS_INT){
-	    Serial.print("EncErr: delta ");
-	    Serial.print(delta);
-	    Serial.print(" Prv ");
-	    Serial.print(spindlePcntPrev);
-	    Serial.print(" New ");
-	    Serial.println(spindlePcntNew);
-      return;
+      Serial.print("EncErr: delta ");
+      Serial.print(delta);
+      Serial.print(" Prv ");
+      Serial.print(spindlePcntPrev);
+      Serial.print(" New ");
+      Serial.println(spindlePcntNew);
+      //return;
     }
     spindlePcntPrev = spindlePcntNew;
   } else {
