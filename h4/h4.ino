@@ -3,7 +3,7 @@
 /* Change values in this section to suit your hardware. */
 
 // Define your hardware parameters here.
-const int ENCODER_PPR = 1000; // 1000 step spindle optical rotary encoder. Fractional values not supported.
+const int ENCODER_PPR = 2000; // 1000 step spindle optical rotary encoder. Fractional values not supported.
 const int ENCODER_BACKLASH = 8; // Numer of impulses encoder can issue without movement of the spindle
 
 // Spindle rotary encoder pins. Swap values if the rotation direction is wrong.
@@ -11,15 +11,15 @@ const int ENCODER_BACKLASH = 8; // Numer of impulses encoder can issue without m
 #define ENC_B 15
 
 // Main lead screw (Z) parameters.
-const long SCREW_Z_DU = 15000; // 1.5mm lead screw in deci-microns (10^-7 of a meter)
+const long SCREW_Z_DU = 10000; // 1.5mm lead screw in deci-microns (10^-7 of a meter)
 const long MOTOR_STEPS_Z = 1600;
 const long SPEED_START_Z = 2 * MOTOR_STEPS_Z; // Initial speed of a motor, steps / second.
 const long ACCELERATION_Z = 30 * MOTOR_STEPS_Z; // Acceleration of a motor, steps / second ^ 2.
 const long SPEED_MANUAL_MOVE_Z = 6 * MOTOR_STEPS_Z; // Maximum speed of a motor during manual move, steps / second.
-const bool INVERT_Z = true; // change (true/false) if the carriage moves e.g. "left" when you press "right".
+const bool INVERT_Z = false; // change (true/false) if the carriage moves e.g. "left" when you press "right".
 const bool NEEDS_REST_Z = true; // Set to false for closed-loop drivers, true for open-loop.
 const long MAX_TRAVEL_MM_Z = 300; // Lathe bed doesn't allow to travel more than this in one go, 30cm / ~1 foot
-const long BACKLASH_DU_Z = 2600; // 0.26mm backlash in deci-microns (10^-7 of a meter)
+const long BACKLASH_DU_Z = 1000; // 0.1mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_Z = 'Z'; // Text shown on screen before axis position value, GCode axis name
 const bool Z_POS_BY_DRO = true; // sync position to axis encoder while stepper disabled
                                 // be carefull, enabling this without any DRO source could lock axis
@@ -27,14 +27,14 @@ const bool Z_BACKLASH_BY_DRO = true;
 
 // Cross-slide lead screw (X) parameters.
 const long SCREW_X_DU = 10000; // 1.0mm lead screw in deci-microns (10^-7) of a meter
-const long MOTOR_STEPS_X = 2400; // 800 steps at 3x reduction
+const long MOTOR_STEPS_X = 3200; // 800 steps at 4x reduction
 const long SPEED_START_X = MOTOR_STEPS_X; // Initial speed of a motor, steps / second.
 const long ACCELERATION_X = 10 * MOTOR_STEPS_X; // Acceleration of a motor, steps / second ^ 2.
 const long SPEED_MANUAL_MOVE_X = 3 * MOTOR_STEPS_X; // Maximum speed of a motor during manual move, steps / second.
-const bool INVERT_X = true; // change (true/false) if the carriage moves e.g. "left" when you press "right".
+const bool INVERT_X = false; // change (true/false) if the carriage moves e.g. "left" when you press "right".
 const bool NEEDS_REST_X = true; // Set to false for all kinds of drivers or X will be unlocked when not moving.
 const long MAX_TRAVEL_MM_X = 100; // Cross slide doesn't allow to travel more than this in one go, 10cm
-const long BACKLASH_DU_X = 400; // 0.04mm backlash in deci-microns (10^-7 of a meter)
+const long BACKLASH_DU_X = 350; // 0.035mm backlash in deci-microns (10^-7 of a meter)
 const char NAME_X = 'X'; // Text shown on screen before axis position value, GCode axis name
 const bool X_POS_BY_DRO = true; // sync position to axis encoder while stepper disabled
                                 // be carefull, enabling this without any DRO source could lock axis
@@ -80,16 +80,16 @@ const float PULSE_PER_REVOLUTION = 100; // PPR of handwheels used on A1 and/or A
 const long PULSE_MIN_WIDTH_US = 1000; // Microseconds width of the pulse that is required for it to be registered. Prevents noise.
 const long PULSE_HALF_BACKLASH = 2; // Prevents spurious reverses when moving using a handwheel. Raise to 3 or 4 if they still happen.
 
-const int ENCODER_TYPE = 2; // 1 - Single (A channel falling edge count only),
+const int ENCODER_TYPE = 4; // 1 - Single (A channel falling edge count only),
                             // 2 - halfQuad (A channel falling and rising edges count)
                             // 4 - fullQuad (falling and rising edges count on both channels)
 const int PULSE_1_ENCODER_TYPE = 4;
 const int PULSE_2_ENCODER_TYPE = 4;
-const int PULSE_1_ENCODER_FILTER = 255;
-const int PULSE_2_ENCODER_FILTER = 255;
+const int PULSE_1_ENCODER_FILTER = 1023;
+const int PULSE_2_ENCODER_FILTER = 1023;
                             
 const int ENCODER_STEPS_INT = ENCODER_PPR * ENCODER_TYPE; // Number of encoder impulses PCNT counts per revolution of the spindle
-const int ENCODER_FILTER = 2; // Encoder pulses shorter than this will be ignored. Clock cycles, 1 - 1023.
+const int ENCODER_FILTER = 255; // Encoder pulses shorter than this will be ignored. Clock cycles, 1 - 1023.
 const int PCNT_LIM = 31000; // Limit used in hardware pulse counter logic.
 const int PCNT_CLEAR = 30000; // Limit where we reset hardware pulse counter value to avoid overflow. Less than PCNT_LIM.
 const long DUPR_MAX = 254000; // No more than 1 inch pitch
@@ -340,6 +340,7 @@ struct Axis {
   long motorPos; // position of the motor in stepper motor steps, same as pos unless moving back, then differs by backlashSteps
   long savedMotorPos; // motorPos saved in Preferences
   bool continuous; // whether current movement is expected to continue until an unknown position
+  long counterDRO; // DRO position in DRO units
   bool posByDRO; // get position from encoder after stepper enabled
 
   long leftStop; // left stop value of pos
@@ -401,6 +402,7 @@ void initAxis(Axis* a, char name, bool active, bool rotational, float motorSteps
   a->motorPos = 0;
   a->savedMotorPos = 0;
   a->continuous = false;
+  a->counterDRO = 0;
   a->posByDRO = posByDRO;
 
   a->leftStop = 0;
@@ -1155,96 +1157,95 @@ void waitForStep(Axis* a) {
   }
 }
 
-void processDRO(Axis *a, long deltaDu) {
-  long pos_delta;
-  long motor_delta;
+void processDRO(Axis *a, long new_pos) {
   if ((a->posByDRO) &&
     (a->disabled || (a->needsRest && a->stepperEnableCounter <= 0) || a->needsDROBacklashCompensation)){
-    pos_delta = round( deltaDu * a->motorSteps / a->screwPitch);
-    if (pos_delta < 0){
+    if ( new_pos < a->pos){
         // going right, motor should be differ by backlashSteps
-        motor_delta = a->pos + pos_delta - a->backlashSteps - a->motorPos;
-        a->motorPos = a->pos + pos_delta - a->backlashSteps;
-        a->posGlobal -=  motor_delta;
-        a->pos += pos_delta;
+        a->posGlobal =  a->posGlobal - new_pos + a->backlashSteps + a->motorPos;
+        a->motorPos = new_pos - a->backlashSteps;
+        a->pos = new_pos;
         a->needsDROBacklashCompensation = false;
-    } else if (pos_delta > 0){
+    } else if (new_pos > a->pos){
         // going left
-        motor_delta = a->pos + pos_delta - a->motorPos;
-        a->motorPos = a->pos + pos_delta;
-        a->posGlobal -=  motor_delta;
-        a->pos += pos_delta;
+        a->posGlobal =  a->posGlobal - new_pos + a->motorPos;
+        a->motorPos = new_pos;
+        a->pos = new_pos;
         a->needsDROBacklashCompensation = false;
     }
   }
 }
+void taskPulseCounters(void *param) {
+  int16_t count;
+  int delta;
+  while (emergencyStop == ESTOP_NONE) {
+    if (PULSE_1_USE){
+      if (xSemaphoreTake(pulse1Mutex, 10) == pdTRUE){
+        pcnt_get_counter_value(PULSE_1_PCNT_UNIT, &count);
+        delta = count - pulse1Count;
+        if (delta !=0){
+          if (count >= PCNT_CLEAR || count <= -PCNT_CLEAR) {
+	    pcnt_counter_clear(PULSE_1_PCNT_UNIT);
+	    pulse1Count = 0;
+          } else {
+	    pulse1Count = count;
+          }
+	  pulse1Delta += delta; // For rotaty encoder counter
+          z.counterDRO += delta;
+	  processDRO(&z,round( z.counterDRO * PULSE_1_DRO_DU * z.motorSteps / z.screwPitch) - z.originPos);
+        }
+	xSemaphoreGive(pulse1Mutex);
+      }
+    }
+    if (PULSE_2_USE){
+      if (xSemaphoreTake(pulse2Mutex, 10) == pdTRUE){
+        pcnt_get_counter_value(PULSE_2_PCNT_UNIT, &count);
+        delta = count - pulse2Count;
+        if (delta !=0){
+          if (count >= PCNT_CLEAR || count <= -PCNT_CLEAR) {
+	    pcnt_counter_clear(PULSE_2_PCNT_UNIT);
+	    pulse2Count = 0;
+          } else {
+	    pulse2Count = count;
+          }
+	  pulse2Delta += delta; // For rotaty encoder counter
+          x.counterDRO += delta;
+	  processDRO(&x,round( x.counterDRO * PULSE_2_DRO_DU * x.motorSteps / x.screwPitch) - x.originPos);
+        }
+	xSemaphoreGive(pulse2Mutex);
+      }
+    }
+    taskYIELD();
+  }
+  vTaskDelete(NULL);
+}
 
 int getAndResetPulses(Axis* a) {
   int delta = 0;
-  if ((PULSE_1_AXIS == a->name) && PULSE_1_USE) {
+  if ((PULSE_1_AXIS == a->name) && PULSE_1_USE && !PULSE_1_DRO) {
     if (xSemaphoreTake(pulse1Mutex, 10) != pdTRUE){
 	return 0;
     }
-    int16_t count;
-    pcnt_get_counter_value(PULSE_1_PCNT_UNIT, &count);
-    delta = count - pulse1Count;
-    if (delta == 0 ){
-	xSemaphoreGive(pulse1Mutex);
-	return 0;
-    }    
-    if (count >= PCNT_CLEAR || count <= -PCNT_CLEAR) {
-	pcnt_counter_clear(PULSE_1_PCNT_UNIT);
-	pulse1Count = 0;
-    } else {
-	pulse1Count = count;
+    if (pulse1Delta < -PULSE_HALF_BACKLASH) {
+      delta = pulse1Delta + PULSE_HALF_BACKLASH;
+      pulse1Delta = -PULSE_HALF_BACKLASH;
+    } else if (pulse1Delta > PULSE_HALF_BACKLASH) {
+      delta = pulse1Delta - PULSE_HALF_BACKLASH;
+      pulse1Delta = PULSE_HALF_BACKLASH;
     }
     xSemaphoreGive(pulse1Mutex);
-
-    if (!PULSE_1_DRO){
-	pulse1Delta = delta + pulse1Delta;
-	if (pulse1Delta < -PULSE_HALF_BACKLASH) {
-	  delta = pulse1Delta + PULSE_HALF_BACKLASH;
-          pulse1Delta = -PULSE_HALF_BACKLASH;
-        } else if (pulse1Delta > PULSE_HALF_BACKLASH) {
-          delta = pulse1Delta - PULSE_HALF_BACKLASH;
-          pulse1Delta = PULSE_HALF_BACKLASH;
-        }
-    } else {
-	processDRO(a,(long) delta * PULSE_1_DRO_DU);
-	return 0;
-    }
-  } else if ((PULSE_2_AXIS == a->name) && PULSE_2_USE) {
+  } else if ((PULSE_2_AXIS == a->name) && PULSE_2_USE && !PULSE_2_DRO) {
     if (xSemaphoreTake(pulse2Mutex, 10) != pdTRUE){
 	return 0;
     }
-    int16_t count;
-    pcnt_get_counter_value(PULSE_2_PCNT_UNIT, &count);
-    delta = count - pulse2Count;
-    if (delta == 0 ){
-        xSemaphoreGive(pulse2Mutex);
-	return 0;
-    }    
-    if (count >= PCNT_CLEAR || count <= -PCNT_CLEAR) {
-	pcnt_counter_clear(PULSE_2_PCNT_UNIT);
-	pulse2Count = 0;
-    } else {
-	pulse2Count = count;
+    if (pulse2Delta < -PULSE_HALF_BACKLASH) {
+      delta = pulse2Delta + PULSE_HALF_BACKLASH;
+      pulse2Delta = -PULSE_HALF_BACKLASH;
+    } else if (pulse2Delta > PULSE_HALF_BACKLASH) {
+      delta = pulse2Delta - PULSE_HALF_BACKLASH;
+      pulse2Delta = PULSE_HALF_BACKLASH;
     }
     xSemaphoreGive(pulse2Mutex);
-
-    if (!PULSE_2_DRO){
-	pulse2Delta = delta + pulse2Delta;
-	if (pulse2Delta < -PULSE_HALF_BACKLASH) {
-	  delta = pulse2Delta + PULSE_HALF_BACKLASH;
-          pulse2Delta = -PULSE_HALF_BACKLASH;
-        } else if (pulse2Delta > PULSE_HALF_BACKLASH) {
-          delta = pulse2Delta - PULSE_HALF_BACKLASH;
-          pulse2Delta = PULSE_HALF_BACKLASH;
-        }
-    } else {
-	processDRO(a,(long) delta * PULSE_2_DRO_DU);
-	return 0;
-    }
   }
   return delta;
 }
@@ -1877,17 +1878,15 @@ void setup() {
   if (a1.active) xTaskCreatePinnedToCore(taskMoveA1, "taskMoveA1", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
   xTaskCreatePinnedToCore(taskAttachInterrupts, "taskAttachInterrupts", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
   xTaskCreatePinnedToCore(taskGcode, "taskGcode", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
-
-  /*
+  if (PULSE_1_USE || PULSE_2_USE)  xTaskCreatePinnedToCore(taskPulseCounters, "taskPulseCounters", 10000 /* stack size */, NULL, 0 /* priority */, NULL, 0 /* core */);
+  
   if (PULSE_1_USE && PULSE_1_DRO && Z_POS_BY_DRO){
-    int64_t precalc = round(getAxisPosDu(&z) / PULSE_1_DRO_DU);
-    //pcntEncoderPulse1.setCount(precalc);
+    z.counterDRO = round(getAxisPosDu(&z) / PULSE_1_DRO_DU);
   }
   if (PULSE_2_USE && PULSE_2_DRO && X_POS_BY_DRO){
-    int64_t precalc = round(getAxisPosDu(&x) / PULSE_2_DRO_DU);
-    //pcntEncoderPulse2.setCount(precalc);
+    x.counterDRO = round(getAxisPosDu(&x) / PULSE_2_DRO_DU);
   }
-  */
+  
 }
 
 bool saveIfChanged() {
@@ -1984,6 +1983,7 @@ void markAxis0(Axis* a) {
     if (xSemaphoreTake(pulse1Mutex, 10) == pdTRUE){
       pcnt_counter_clear(PULSE_1_PCNT_UNIT);
       pulse1Count = 0;
+      a->counterDRO = 0;
       xSemaphoreGive(pulse1Mutex);
     }
   }
@@ -1991,6 +1991,7 @@ void markAxis0(Axis* a) {
     if (xSemaphoreTake(pulse2Mutex, 10) == pdTRUE){
       pcnt_counter_clear(PULSE_2_PCNT_UNIT);
       pulse2Count = 0;
+      a->counterDRO = 0;
       xSemaphoreGive(pulse2Mutex);
     }
   }
