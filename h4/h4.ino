@@ -1192,8 +1192,8 @@ void taskPulseCounters(void *param) {
           }
 	  pulse1Delta += delta; // For rotaty encoder counter
           z.counterDRO += delta;
-	  processDRO(&z,round( z.counterDRO * PULSE_1_DRO_DU * z.motorSteps / z.screwPitch) - z.originPos);
         }
+        processDRO(&z,round( z.counterDRO * PULSE_1_DRO_DU * z.motorSteps / z.screwPitch) - z.originPos);
 	xSemaphoreGive(pulse1Mutex);
       }
     }
@@ -1210,8 +1210,8 @@ void taskPulseCounters(void *param) {
           }
 	  pulse2Delta += delta; // For rotaty encoder counter
           x.counterDRO += delta;
-	  processDRO(&x,round( x.counterDRO * PULSE_2_DRO_DU * x.motorSteps / x.screwPitch) - x.originPos);
         }
+	processDRO(&x,round( x.counterDRO * PULSE_2_DRO_DU * x.motorSteps / x.screwPitch) - x.originPos);
 	xSemaphoreGive(pulse2Mutex);
       }
     }
